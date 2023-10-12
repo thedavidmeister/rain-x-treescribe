@@ -1,0 +1,52 @@
+- flow caller increases an amount that an address may withdraw
+- address withdraws an amount that they specify and specify 1 address other than self (reverts if those addresses did not approve prior)
+- there is an absolute unix timestamp after which a nominated address (hardcoded) may withdraw unlimited amounts
+
+context grid (for increasing amount)
+| base       | caller data |
+| ---        | ---         |
+| msg.sender | recipient   |
+| escrow     | token       |
+|            | amount      |
+
+#increase-amount
+key: hash(context<0 0>() context<1 0>() context<1 1>),
+amount: context<1 2>(),
+:set(key int-add(get(key) amount));
+
+context grid (for withdrawing)
+| base       | caller data |
+| ---        | ---         |
+| msg.sender | coapprover  |
+| escrow     | token       |
+|            | amount      |
+
+#withdraw-amount
+approved-key: hash(context<1 0>() context<0 0>() context<1 1>()),
+approved-amount: get(key),
+withdrawn-key: hash(approved-key),
+withdrawn-amount: get(withdrawn-key),
+new-withdrawn-total: int-add(context<1 2>() withdrawn-amount),
+:ensure(less-than-or-equal-to(new-withdrawn-total approved-amount)),
+:set(withdrawn-key new-withdrawn-total),
+/* erc1155 movements */
+_: sentinel,
+/* erc721 movements */
+_: sentinel,
+/* erc20 movements */
+_: sentinel context<0 1>() context<0 0>() context<1 1>() context<1 2>();
+
+context grid (for withdrawing unlimited)
+| base       | caller data |
+| ---        | ---         |
+| msg.sender | token       |
+| escrow     | amount      |
+
+#timeout
+:ensure(greater-than-or-equal-to(block-timestamp() 1622505600)),
+/* erc1155 movements */
+_: sentinel,
+/* erc721 movements */
+_: sentinel,
+/* erc20 movements */
+_: sentinel context<0 1>() 0x... context<1 0>() context<1 1>();
