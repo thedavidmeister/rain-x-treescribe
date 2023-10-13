@@ -1,33 +1,67 @@
+/*
 - flow caller increases an amount that an address may withdraw
 - address withdraws an amount that they specify and specify 1 address other than self (reverts if those addresses did not approve prior)
 - there is an absolute unix timestamp after which a nominated address (hardcoded) may withdraw unlimited amounts
+*/
 
+/*
 context grid (for increasing amount)
-| base       | caller data |
-| ---        | ---         |
-| msg.sender | recipient   |
-| escrow     | token       |
-|            | amount      |
+| base       | caller data         |
+| ---        | ---                 |
+| flower     | recipient           |
+| escrow     | token               |
+|            | approved-amount-inc |
+*/
 
 #increase-amount
-key: hash(context<0 0>() context<1 0>() context<1 1>),
-amount: context<1 2>(),
-:set(key int-add(get(key) amount));
+/* name the parties according to their pubkeys */
+alice: 0xalice,
+bob: 0xbob,
+carol: 0xcarol,
+/* only the named parties may increase an amount */
+:ensure(
+    any(
+        equal-to(flower alice)
+        equal-to(flower bob)
+        equal-to(flower carol)
+    )
+),
+/* this key matches the key used in the withdrawal */
+approved-key: hash(flower recipient token),
+:set(approved-key int-add(get(approved-key) approved-amount-inc));
 
+/*
 context grid (for withdrawing)
-| base       | caller data |
-| ---        | ---         |
-| msg.sender | coapprover  |
-| escrow     | token       |
-|            | amount      |
+| base       | caller data            |
+| ---        | ---                    |
+| flower     | co-approver            |
+| escrow     | token                  |
+|            | requested-amount       |
+*/
 
 #withdraw-amount
-approved-key: hash(context<1 0>() context<0 0>() context<1 1>()),
-approved-amount: get(key),
+/* name the parties according to their pubkeys */
+alice: 0xalice,
+bob: 0xbob,
+carol: 0xcarol,
+/* only the named parties may withdraw */
+/* this invariant allows us to collapse "2 of 3 signers" into a single co-approver upon withdrawal */
+/* we model all participants as having infinitely approved any withdrawal to themselves implicitly */
+:ensure(
+    any(
+        equal-to(flower alice)
+        equal-to(flower bob)
+        equal-to(flower carol)
+    )
+),
+approved-key: hash(co-approver flower token),
+approved-amount: get(approved-key),
 withdrawn-key: hash(approved-key),
 withdrawn-amount: get(withdrawn-key),
-new-withdrawn-total: int-add(context<1 2>() withdrawn-amount),
-:ensure(less-than-or-equal-to(new-withdrawn-total approved-amount)),
+new-withdrawn-total: int-add(requested-amount withdrawn-amount),
+:ensure(
+    less-than-or-equal-to(new-withdrawn-total approved-amount)
+),
 :set(withdrawn-key new-withdrawn-total),
 /* erc1155 movements */
 _: sentinel,
@@ -36,11 +70,13 @@ _: sentinel,
 /* erc20 movements */
 _: sentinel context<0 1>() context<0 0>() context<1 1>() context<1 2>();
 
+/*
 context grid (for withdrawing unlimited)
 | base       | caller data |
 | ---        | ---         |
 | msg.sender | token       |
 | escrow     | amount      |
+*/
 
 #timeout
 :ensure(greater-than-or-equal-to(block-timestamp() 1622505600)),
