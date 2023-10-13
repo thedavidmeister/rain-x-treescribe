@@ -5,6 +5,19 @@
 */
 
 /*
+context grid (for setting carol)
+| base       | caller data |
+| ---        | ---         |
+| flower     | carol       |
+| escrow     |             |
+*/
+
+#set-carol
+:ensure(equal-to(flower 0xpat)),
+/* we will just arbitrarily use key 0 to store carol's address */
+:set(0 carol);
+
+/*
 context grid (for increasing amount)
 | base       | caller data         |
 | ---        | ---                 |
@@ -17,7 +30,7 @@ context grid (for increasing amount)
 /* name the parties according to their pubkeys */
 alice: 0xalice,
 bob: 0xbob,
-carol: 0xcarol,
+carol: get(0),
 /* only the named parties may increase an amount */
 :ensure(
     any(
@@ -43,7 +56,7 @@ context grid (for withdrawing)
 /* name the parties according to their pubkeys */
 alice: 0xalice,
 bob: 0xbob,
-carol: 0xcarol,
+carol: get(0),
 /* only the named parties may withdraw */
 /* this invariant allows us to collapse "2 of 3 signers" into a single co-approver upon withdrawal */
 /* we model all participants as having infinitely approved any withdrawal to themselves implicitly */
@@ -68,7 +81,8 @@ _: sentinel,
 /* erc721 movements */
 _: sentinel,
 /* erc20 movements */
-_: sentinel context<0 1>() context<0 0>() context<1 1>() context<1 2>();
+/* from to token amount */
+_: sentinel escrow flower token requested-amount;
 
 /*
 context grid (for withdrawing unlimited)
@@ -79,10 +93,17 @@ context grid (for withdrawing unlimited)
 */
 
 #timeout
-:ensure(greater-than-or-equal-to(block-timestamp() 1622505600)),
+/* specify an absolute time after which arbitrary funds may be sent to a nominated address */
+/* this is a failsafe in the case of unexpected circumstances */
+/* as the circumstances are unexpected, we do not want to rely on any particular party to be able to withdraw */
+final-time: 1622505600,
+/* this can be anyone, not just the three named parties */
+recipient: 0xrecipient,
+:ensure(greater-than-or-equal-to(block-timestamp() final-time)),
 /* erc1155 movements */
 _: sentinel,
 /* erc721 movements */
 _: sentinel,
 /* erc20 movements */
-_: sentinel context<0 1>() 0x... context<1 0>() context<1 1>();
+/* from to token amount */
+_: sentinel escrow recipient token amount;
